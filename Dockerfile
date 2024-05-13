@@ -10,7 +10,7 @@
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS dev
 
 RUN apt-get update -y \
-    && apt-get install -y python3-pip git
+    && apt-get install -y python-is-python3 python3-pip python3-build git
 
 # Workaround for https://github.com/openai/triton/issues/2507 and
 # https://github.com/pytorch/pytorch/issues/107960 -- hopefully
@@ -73,7 +73,7 @@ ENV VLLM_INSTALL_PUNICA_KERNELS=1
 ENV CCACHE_DIR=/root/.cache/ccache
 RUN --mount=type=cache,target=/root/.cache/ccache \
     --mount=type=cache,target=/root/.cache/pip \
-    python3 setup.py bdist_wheel --dist-dir=dist
+    python -m build --wheel --outdir=dist --no-isolation
 
 # check the size of the wheel, we cannot upload wheels larger than 100MB
 COPY .buildkite/check-wheel-size.py check-wheel-size.py
