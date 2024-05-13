@@ -30,7 +30,7 @@ RUN cd /app/vllm \
 
 ENV VLLM_BUILD_WITH_NEURON 1
 RUN cd /app/vllm \
-    && pip install -e . \
+    && pip install -v --no-build-isolation -e . \
     && cd ..
 
 CMD ["/bin/bash"]
