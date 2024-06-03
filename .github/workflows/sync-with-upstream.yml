@@ -38,6 +38,7 @@ jobs:
         id: sync
         if: ${{ steps.diff.outputs.diff != '' }}
         run: |
+          set -vx
           git_hash="$(git rev-parse ${REMOTE}/${BRANCH})"
           echo "git_hash=$git_hash" >> $GITHUB_OUTPUT
           git_describe="$(git describe --tags ${REMOTE}/${BRANCH})"
