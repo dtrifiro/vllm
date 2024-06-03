@@ -1,0 +1,63 @@
+name: "Sync with upstream"
+
+on:
+  schedule:
+    - cron: 20 4 * * *
+
+  workflow_dispatch:
+
+
+jobs:
+  poetry-update:
+    name: Update dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch upstream repo
+        run: |
+          git remote add upstream https://github.com/vllm-project/vllm
+          git fetch upstream
+
+      - name: Check diff
+        id: diff
+        shell: bash
+        run: |
+          echo 'diff<<EOF' >> $GITHUB_OUTPUT
+          git diff upstream/main | tee -a >(cat >> $GITHUB_OUTPUT)
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Sync with upstream
+        id: sync
+        if: ${{ steps.diff.outputs.diff != '' }}
+        run: |
+          git_hash="$(git rev-parse upstream/main)"
+          echo "git_hash=$git_hash" >> $GITHUB_OUTPUT
+          git_describe="$(git describe --tags upstream/main)"
+          echo "git_describe=$git_describe" >> $GITHUB_OUTPUT
+
+          git merge --no-ff upstream/main
+          commit_message="Sync with upstream @ $git_describe"
+          echo commit_message="${commit_message}" >> $GITHUB_OUTPUT
+
+          git commit -m "$commit_message" --no-edit
+
+          echo commits="$(git log --oneline upstream/main.." >> $GITHUB_OUTPUT
+
+      - name: Open PR
+        if: ${{ steps.diff.outputs.diff != '' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ github.token }}
+          commit-message: ${{ steps.sync.outputs.commit_message }}
+          title: Sync with Upstream
+          labels: |
+            code-sync
+          body: |
+            Sync with upstream @ ${{ steps.sync.outputs.description }} (https://github.com/vllm-project/vllm/commit/${{ steps.sync.outputs.git_hash }})
+
+            Commit list:
+
+            ```console
+            ${{ steps.sync.outputs.commits }}
+            ```
