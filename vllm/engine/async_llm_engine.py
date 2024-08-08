@@ -132,7 +132,8 @@ class RequestTracker:
             self._request_streams[request_id].put(exc)
             self.abort_request(request_id)
         else:
-            for rid, stream in self._request_streams.items():
+            for rid in list(self._request_streams): # avoid iterating over dict to avoid RuntimeError: dictionary changed size during iteration
+                stream = self._request_streams[rid]
                 stream.put(exc)
                 self.abort_request(rid)
 
