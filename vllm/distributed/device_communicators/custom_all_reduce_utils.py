@@ -13,7 +13,8 @@ import torch.multiprocessing as mp
 import vllm.envs as envs
 from vllm.distributed.device_communicators.cuda_wrapper import CudaRTLibrary
 from vllm.logger import init_logger
-from vllm.utils import cuda_device_count_stateless
+from vllm.utils import (cuda_device_count_stateless,
+                        update_environment_variables)
 
 logger = init_logger(__name__)
 
@@ -24,7 +25,8 @@ def producer(batch_src: Sequence[int],
              result_queue,
              cuda_visible_devices: Optional[str] = None):
     if cuda_visible_devices is not None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = cuda_visible_devices
+        update_environment_variables(
+            {"CUDA_VISIBLE_DEVICES": cuda_visible_devices})
 
     lib = CudaRTLibrary()
     for i in batch_src:
@@ -56,7 +58,8 @@ def consumer(batch_tgt: Sequence[int],
              result_queue,
              cuda_visible_devices: Optional[str] = None):
     if cuda_visible_devices is not None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = cuda_visible_devices
+        update_environment_variables(
+            {"CUDA_VISIBLE_DEVICES": cuda_visible_devices})
 
     lib = CudaRTLibrary()
     for j in batch_tgt:
@@ -123,7 +126,7 @@ def can_actually_p2p(
     processes for testing all pairs of GPUs in batch. The trick is to reset
     the device after each test (which is not available in PyTorch).
     """  # noqa
-    cuda_visible_devices = os.getenv('CUDA_VISIBLE_DEVICES', None)
+    cuda_visible_devices = envs.CUDA_VISIBLE_DEVICES
     # pass the CUDA_VISIBLE_DEVICES to the child process
     # to make sure they see the same set of GPUs
 
@@ -142,6 +145,7 @@ def can_actually_p2p(
     p_tgt.start()
     p_src.join()
     p_tgt.join()
+    assert p_src.exitcode == 0 and p_tgt.exitcode == 0
     result: List[bool] = []
     for src, tgt in zip(batch_src, batch_tgt):
         a = result_queue.get()
@@ -186,10 +190,10 @@ def gpu_p2p_access_check(src: int, tgt: int) -> bool:
     cuda_visible_devices = envs.CUDA_VISIBLE_DEVICES
     if cuda_visible_devices is None:
         cuda_visible_devices = ",".join(str(i) for i in range(num_dev))
-    VLLM_CONFIG_ROOT = envs.VLLM_CONFIG_ROOT
-    path = os.path.expanduser(
-        f"{VLLM_CONFIG_ROOT}/vllm/gpu_p2p_access_cache_for_{cuda_visible_devices}.json"
-    )
+
+    path = os.path.join(
+        envs.VLLM_CACHE_ROOT,
+        f"gpu_p2p_access_cache_for_{cuda_visible_devices}.json")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     from vllm.distributed.parallel_state import get_world_group
     if ((not is_distributed or get_world_group().local_rank == 0)
@@ -218,7 +222,8 @@ def gpu_p2p_access_check(src: int, tgt: int) -> bool:
             # wrap raised exception to provide more information
             raise RuntimeError(
                 f"Error happened when batch testing "
-                f"peer-to-peer access from {batch_src} to {batch_tgt}") from e
+                f"peer-to-peer access from {batch_src} to {batch_tgt}:\n"
+                f"{returned.stderr.decode()}") from e
         result = pickle.loads(returned.stdout)
         for _i, _j, r in zip(batch_src, batch_tgt, result):
             cache[f"{_i}->{_j}"] = r

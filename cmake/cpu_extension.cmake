@@ -46,6 +46,8 @@ is_avx512_disabled(AVX512_DISABLED)
 
 find_isa(${CPUINFO} "avx2" AVX2_FOUND)
 find_isa(${CPUINFO} "avx512f" AVX512_FOUND)
+find_isa(${CPUINFO} "POWER10" POWER10_FOUND)
+find_isa(${CPUINFO} "POWER9" POWER9_FOUND)
 
 if (AVX512_FOUND AND NOT AVX512_DISABLED)
     list(APPEND CXX_COMPILE_FLAGS
@@ -68,11 +70,20 @@ if (AVX512_FOUND AND NOT AVX512_DISABLED)
 elseif (AVX2_FOUND)
     list(APPEND CXX_COMPILE_FLAGS "-mavx2")
     message(WARNING "vLLM CPU backend using AVX2 ISA")
+elseif (POWER9_FOUND OR POWER10_FOUND)
+    message(STATUS "PowerPC detected")
+    # Check for PowerPC VSX support
+    list(APPEND CXX_COMPILE_FLAGS
+        "-mvsx"
+        "-mcpu=native"
+        "-mtune=native")
 else()
-    message(FATAL_ERROR "vLLM CPU backend requires AVX512 or AVX2 ISA support.")
+    message(FATAL_ERROR "vLLM CPU backend requires AVX512 or AVX2 or Power9+ ISA support.")
 endif()
 
 message(STATUS "CPU extension compile flags: ${CXX_COMPILE_FLAGS}")
+
+list(APPEND LIBS "numa")
 
 
 #
@@ -86,6 +97,7 @@ set(VLLM_EXT_SRC
     "csrc/cpu/activation.cpp"
     "csrc/cpu/attention.cpp"
     "csrc/cpu/cache.cpp"
+    "csrc/cpu/utils.cpp"
     "csrc/cpu/layernorm.cpp"
     "csrc/cpu/pos_encoding.cpp"
     "csrc/cpu/torch_bindings.cpp")
@@ -95,11 +107,11 @@ define_gpu_extension_target(
     DESTINATION vllm
     LANGUAGE CXX
     SOURCES ${VLLM_EXT_SRC}
+    LIBRARIES ${LIBS}
     COMPILE_FLAGS ${CXX_COMPILE_FLAGS}
     USE_SABI 3
     WITH_SOABI
 )
 
-add_custom_target(default)
 message(STATUS "Enabling C extension.")
 add_dependencies(default _C)
