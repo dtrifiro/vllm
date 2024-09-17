@@ -532,8 +532,11 @@ async def run_server(args, **uvicorn_kwargs) -> None:
     logger.info("vLLM API server version %s", VLLM_VERSION)
     logger.info("args: %s", args)
 
-    temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    temp_socket.bind(("", args.port))
+    # workaround to make sure that we bind the port before the engine is set up.
+    # This avoids race conditions with ray.
+    # see https://github.com/vllm-project/vllm/issues/8204
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("", args.port))
 
     def signal_handler(*_) -> None:
         # Interrupt server on sigterm while initializing
@@ -551,8 +554,6 @@ async def run_server(args, **uvicorn_kwargs) -> None:
         model_config = await async_engine_client.get_model_config()
         init_app_state(async_engine_client, model_config, app.state, args)
 
-        temp_socket.close()
-
         shutdown_task = await serve_http(
             app,
             limit_concurrency=async_engine_client.limit_concurrency,
@@ -564,6 +565,7 @@ async def run_server(args, **uvicorn_kwargs) -> None:
             ssl_certfile=args.ssl_certfile,
             ssl_ca_certs=args.ssl_ca_certs,
             ssl_cert_reqs=args.ssl_cert_reqs,
+            fd=sock.fileno(),
             **uvicorn_kwargs,
         )
 
