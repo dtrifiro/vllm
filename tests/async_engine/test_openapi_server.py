@@ -10,8 +10,44 @@ chatml_jinja_path = VLLM_PATH / "examples/template_chatml.jinja"
 assert chatml_jinja_path.exists()
 
 
+@pytest.fixture
+def server_args(request: pytest.FixtureRequest):
+    """ Provide extra arguments to the server via indirect parametrization
+
+    Usage:
+
+    >>> @pytest.mark.parametrize(
+    >>>     "server_args",
+    >>>     [
+    >>>         ["--disable-frontend-multiprocessing"],
+    >>>         [
+    >>>             "--model=NousResearch/Hermes-3-Llama-3.1-70B",
+    >>>             "--enable-auto-tool-choice",
+    >>>         ],
+    >>>     ],
+    >>>     indirect=True,
+    >>> )
+    >>> def test_foo(server, client):
+    >>>     ...
+
+    This will run `test_foo` twice with servers with:
+    - `--disable-frontend-multiprocessing`
+    - `--model=NousResearch/Hermes-3-Llama-3.1-70B --enable-auto-tool-choice`.
+
+    """
+    if not hasattr(request, "param"):
+        return []
+
+    val = request.param
+
+    if isinstance(val, str):
+        return [val]
+
+
+    return request.param
+
 @pytest.fixture(scope="module")
-def server():
+def server(server_args: pytest.ArgFixture[list[str]]):
     args = [
         # use half precision for speed and memory savings in CI environment
         "--dtype",
@@ -21,6 +57,7 @@ def server():
         "--enforce-eager",
         "--chat-template",
         str(chatml_jinja_path),
+        *server_args,
     ]
 
     with RemoteOpenAIServer(MODEL_NAME, args) as remote_server:
@@ -33,6 +70,12 @@ async def client(server):
         yield async_client
 
 
+@pytest.mark.parametrize("server_args", [
+        [],
+        ["--disable-frontend-multiprocessing"]
+    ],
+    indirect=True,
+ )
 @pytest.mark.asyncio
 async def test_check_models(client: openai.AsyncOpenAI):
     models = await client.models.list()
@@ -42,6 +85,12 @@ async def test_check_models(client: openai.AsyncOpenAI):
     assert all(model.root == MODEL_NAME for model in models)
 
 
+@pytest.mark.parametrize("server_args", [
+        [],
+        ["--disable-frontend-multiprocessing"]
+    ],
+    indirect=True,
+ )
 @pytest.mark.asyncio
 async def test_single_completion(client: openai.AsyncOpenAI):
     completion = await client.completions.create(model=MODEL_NAME,
