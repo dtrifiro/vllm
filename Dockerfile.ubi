@@ -122,6 +122,7 @@ ENV SCCACHE_S3_KEY_PREFIX='sccache' \
     SCCACHE_REGION=us-east \
     SCCACHE_ENDPOINT=s3.us-east.cloud-object-storage.appdomain.cloud
 
+ENV SCCACHE_LOG=debug
 RUN --mount=type=secret,id=AWS_ACCESS_KEY_ID,env=AWS_ACCESS_KEY_ID,required=True \
     --mount=type=secret,id=AWS_SECRET_ACCESS_KEY,env=AWS_SECRET_ACCESS_KEY,required=True \
 --mount=type=cache,target=/root/.cache/pip \
