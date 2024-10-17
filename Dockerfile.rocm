@@ -117,6 +117,13 @@ RUN --mount=type=cache,target=${CCACHE_DIR} \
 FROM base AS final
 # Import the vLLM development directory from the build context
 COPY . .
+ARG GIT_REPO_CHECK
+RUN --mount=type=bind,source=.git,target=.git \
+    if [ "$GIT_REPO_CHECK" != 0 ]; then \
+        # check that repo is not dirty and tags are present
+        git diff --quiet \
+        git describe --tags;   \
+    fi
 
 # Package upgrades for useful functionality or to avoid dependency issues
 RUN --mount=type=cache,target=/root/.cache/pip \
