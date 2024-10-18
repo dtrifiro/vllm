@@ -1,0 +1,17 @@
+agents:
+  queue: default
+steps:
+  - label: "hello world"
+    commands: |
+      python --version
+      python -m venv .venv
+      source .venv/bin/activate
+
+
+      echo $HOME
+      env
+
+      pip install uv
+      uv pip install vllm
+
+      vllm --help
