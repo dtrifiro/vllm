@@ -1,15 +1,17 @@
 agents:
   queue: default
 steps:
-  - label: "hello world"
+  - label: "env info"
     commands: |
-      python --version
+      echo "- python: $(python --version)"
+      echo "- working directory is: $(pwd)"
+      echo "- env: "
+      env
+
+  - label: "install vllm"
+    commands: |
       python -m venv .venv
       source .venv/bin/activate
-
-
-      echo $HOME
-      env
 
       pip install uv
       uv pip install vllm==0.6.3.post1
