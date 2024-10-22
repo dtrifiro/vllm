@@ -1,6 +1,10 @@
 agents:
   queue: default
 steps:
+  - label: "sleep"
+    commands: |
+      sleep 7200
+
   - label: "env info"
     commands: |
       echo "- python: $(python --version)"
