@@ -3,7 +3,7 @@ agents:
 steps:
   - label: "build vllm"
     commands: |
-      buildah build \
+      buildah build --isolation chroot \
         --build-arg max_jobs=8 \
         --build-arg VLLM_CPU_DISABLE_AVX512=false \
         --build-arg GIT_REPO_CHECK=1 \
