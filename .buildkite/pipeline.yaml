@@ -6,4 +6,5 @@ steps:
       podman build \
         --build-arg max_jobs=8 \
         --build-arg VLLM_CPU_DISABLE_AVX512=false \
+        --build-arg GIT_REPO_CHECK=1 \
         -f Dockerfile.cpu
