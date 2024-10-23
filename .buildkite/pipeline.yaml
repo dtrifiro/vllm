@@ -3,4 +3,4 @@ agents:
 steps:
   - label: "build vllm"
     commands: |
-      docker build --build-arg max_jobs=8 -f Dockerfile.cpu
+      podman build --build-arg max_jobs=8 -f Dockerfile.cpu
