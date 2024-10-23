@@ -1,23 +1,6 @@
 agents:
   queue: default
 steps:
-  - label: "sleep"
+  - label: "build vllm"
     commands: |
-      sleep 7200
-
-  - label: "env info"
-    commands: |
-      echo "- python: $(python --version)"
-      echo "- working directory is: $(pwd)"
-      echo "- env: "
-      env
-
-  - label: "install vllm"
-    commands: |
-      python -m venv .venv
-      source .venv/bin/activate
-
-      pip install uv
-      uv pip install vllm==0.6.3.post1
-
-      vllm --help
+      docker build --build-arg max_jobs=8 -f Dockerfile.cpu
