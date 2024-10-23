@@ -3,4 +3,7 @@ agents:
 steps:
   - label: "build vllm"
     commands: |
-      podman build --build-arg max_jobs=8 -f Dockerfile.cpu
+      podman build \
+        --build-arg max_jobs=8 \
+        --build-arg VLLM_CPU_DISABLE_AVX512=false \
+        -f Dockerfile.cpu
