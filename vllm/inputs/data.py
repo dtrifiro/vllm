@@ -59,6 +59,26 @@ class TokensPrompt(TypedDict):
     """
 
 
+class AudioTranscriptionPrompt(TypedDict):
+    """Schema for a Audio Transcription prompt."""
+
+    prompt: NotRequired[str]
+    """The optional text to be tokenized before passing to the model."""
+
+    multi_modal_data: "MultiModalDataDict"
+    """
+    Audio time series to be passed to the model
+    """
+
+    mm_processor_kwargs: NotRequired[Dict[str, Any]]
+    """
+    Optional multi-modal processor kwargs to be forwarded to the
+    multimodal input mapper & processor. Note that if multiple modalities
+    have registered mappers etc for the model being considered, we attempt
+    to pass the mm_processor_kwargs to each of them.
+    """
+
+
 SingletonPrompt = Union[str, TextPrompt, TokensPrompt]
 """
 Set of possible schemas for a single prompt:

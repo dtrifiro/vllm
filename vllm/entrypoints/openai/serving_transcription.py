@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import asyncio
 import io
-from typing import AsyncGenerator, Optional, Union, cast
+from typing import AsyncGenerator, Optional, Union
 
 from fastapi import Request
 
@@ -15,7 +15,7 @@ from vllm.entrypoints.openai.protocol import (ErrorResponse,
                                               TranscriptionResponseVerbose)
 from vllm.entrypoints.openai.serving_engine import OpenAIServing
 from vllm.entrypoints.openai.serving_models import OpenAIServingModels
-from vllm.inputs.data import PromptType
+from vllm.inputs.data import ExplicitEncoderDecoderPrompt, TokensPrompt
 from vllm.logger import init_logger
 from vllm.outputs import RequestOutput
 from vllm.utils import PlaceholderModule
@@ -170,7 +170,7 @@ class OpenAIServingTranscription(OpenAIServing):
         self,
         request: TranscriptionRequest,
         audio_data: bytes,
-    ) -> PromptType:
+    ) -> ExplicitEncoderDecoderPrompt[TokensPrompt, TokensPrompt]:
         # Validate request
         # TODO language should be optional and can be guessed.
         # For now we default to en. See
@@ -201,17 +201,17 @@ class OpenAIServingTranscription(OpenAIServing):
                 f"Maximum clip duration ({MAX_AUDIO_CLIP_DURATION_S}s) "
                 "exceeded.")
 
-        prompt = {
-            "encoder_prompt": {
+        return ExplicitEncoderDecoderPrompt(
+            encoder_prompt={
                 "prompt": "",
                 "multi_modal_data": {
                     "audio": (y, sr),
                 },
             },
-            "decoder_prompt":
+            decoder_prompt=
             f"<|startoftranscript|>{lang_token}<|transcribe|><|notimestamps|>{request.prompt}"
-        }
-        return cast(PromptType, prompt)
+            # return cast(PromptType, prompt)
+        )
 
     # TODO (varun) : Make verbose response work !
     async def create_transcription(
