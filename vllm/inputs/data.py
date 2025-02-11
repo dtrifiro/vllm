@@ -79,12 +79,14 @@ class AudioTranscriptionPrompt(TypedDict):
     """
 
 
-SingletonPrompt = Union[str, TextPrompt, TokensPrompt]
+SingletonPrompt = Union[str, TextPrompt, TokensPrompt,
+                        AudioTranscriptionPrompt]
 """
 Set of possible schemas for a single prompt:
 
-- A text prompt (:class:`str` or :class:`TextPrompt`)
+- A text prompt (:class:`str` or :class:`TextPromptAudioTranscriptionPrompt
 - A tokenized prompt (:class:`TokensPrompt`)
+- An audio transcription prompt (:class:`AudioTranscriptionPrompt`)
 
 Note that "singleton" is as opposed to a data structure
 which encapsulates multiple prompts, i.e. of the sort

@@ -55,7 +55,8 @@ def resample_audio(
 class AudioMediaIO(MediaIO[tuple[npt.NDArray, float]]):
 
     def load_bytes(self, data: bytes) -> tuple[npt.NDArray, float]:
-        return librosa.load(BytesIO(data), sr=None)
+        with BytesIO(data) as bytes_:
+            return librosa.load(bytes_, sr=None)
 
     def load_base64(
         self,

@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 import asyncio
-import io
 from typing import AsyncGenerator, Optional, Union
 
 from fastapi import Request
@@ -15,8 +14,10 @@ from vllm.entrypoints.openai.protocol import (ErrorResponse,
                                               TranscriptionResponseVerbose)
 from vllm.entrypoints.openai.serving_engine import OpenAIServing
 from vllm.entrypoints.openai.serving_models import OpenAIServingModels
-from vllm.inputs.data import ExplicitEncoderDecoderPrompt, TokensPrompt
+from vllm.inputs.data import (AudioTranscriptionPrompt,
+                              ExplicitEncoderDecoderPrompt, TextPrompt)
 from vllm.logger import init_logger
+from vllm.multimodal.audio import AudioMediaIO
 from vllm.outputs import RequestOutput
 from vllm.utils import PlaceholderModule
 
@@ -142,6 +143,9 @@ MAX_AUDIO_CLIP_FILESIZE_MB = 25
 # TODO get from processor.feature_extractor.chunk_length
 MAX_AUDIO_CLIP_DURATION_S = 30
 
+AudioEncoderDecoderPrompt = ExplicitEncoderDecoderPrompt[
+    AudioTranscriptionPrompt, TextPrompt]
+
 
 class OpenAIServingTranscription(OpenAIServing):
 
@@ -170,7 +174,7 @@ class OpenAIServingTranscription(OpenAIServing):
         self,
         request: TranscriptionRequest,
         audio_data: bytes,
-    ) -> ExplicitEncoderDecoderPrompt[TokensPrompt, TokensPrompt]:
+    ) -> AudioEncoderDecoderPrompt:
         # Validate request
         # TODO language should be optional and can be guessed.
         # For now we default to en. See
@@ -194,24 +198,22 @@ class OpenAIServingTranscription(OpenAIServing):
         if len(audio_data) / 1024**2 > MAX_AUDIO_CLIP_FILESIZE_MB:
             raise ValueError("Maximum file size exceeded.")
 
-        with io.BytesIO(audio_data) as bytes_:
-            y, sr = librosa.load(bytes_)
+        y, sr = AudioMediaIO().load_bytes(audio_data)
         if librosa.get_duration(y=y, sr=sr) > MAX_AUDIO_CLIP_DURATION_S:
             raise ValueError(
                 f"Maximum clip duration ({MAX_AUDIO_CLIP_DURATION_S}s) "
                 "exceeded.")
 
-        return ExplicitEncoderDecoderPrompt(
-            encoder_prompt={
-                "prompt": "",
-                "multi_modal_data": {
-                    "audio": (y, sr),
-                },
-            },
-            decoder_prompt=
-            f"<|startoftranscript|>{lang_token}<|transcribe|><|notimestamps|>{request.prompt}"
-            # return cast(PromptType, prompt)
-        )
+        from vllm.inputs.data import build_explicit_enc_dec_prompt
+
+        # return AudioEncoderDecoderPrompt(
+        return build_explicit_enc_dec_prompt(
+            encoder_prompt=AudioTranscriptionPrompt(
+                prompt="", multi_modal_data={"audio": [y, sr]}),
+            decoder_prompt=TextPrompt(
+                prompt=
+                f"<|startoftranscript|>{lang_token}<|transcribe|><|notimestamps|>{request.prompt}"
+            ))
 
     # TODO (varun) : Make verbose response work !
     async def create_transcription(
