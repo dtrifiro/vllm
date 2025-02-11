@@ -207,13 +207,17 @@ class OpenAIServingTranscription(OpenAIServing):
         from vllm.inputs.data import build_explicit_enc_dec_prompt
 
         # return AudioEncoderDecoderPrompt(
+        encoder_prompt = AudioTranscriptionPrompt(
+            prompt="", multi_modal_data={"audio": [y, sr]})
+        decoder_prompt = TextPrompt(
+            prompt=
+            f"<|startoftranscript|>{lang_token}<|transcribe|><|notimestamps|>{request.prompt}"
+        )
+
         return build_explicit_enc_dec_prompt(
-            encoder_prompt=AudioTranscriptionPrompt(
-                prompt="", multi_modal_data={"audio": [y, sr]}),
-            decoder_prompt=TextPrompt(
-                prompt=
-                f"<|startoftranscript|>{lang_token}<|transcribe|><|notimestamps|>{request.prompt}"
-            ))
+            encoder_prompt=encoder_prompt,
+            decoder_prompt=decoder_prompt,
+        )
 
     # TODO (varun) : Make verbose response work !
     async def create_transcription(
@@ -278,12 +282,11 @@ class OpenAIServingTranscription(OpenAIServing):
             sampling_params = request.to_sampling_params(
                 default_max_tokens, default_params)
 
-            self._log_inputs(
-                request_id,
-                prompt['decoder_prompt'],  # type: ignore
-                params=sampling_params,
-                lora_request=None,
-                prompt_adapter_request=None)
+            self._log_inputs(request_id,
+                             prompt['decoder_prompt']['prompt'],
+                             params=sampling_params,
+                             lora_request=None,
+                             prompt_adapter_request=None)
 
             result_generator = self.engine_client.generate(
                 prompt,
