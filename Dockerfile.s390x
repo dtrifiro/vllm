@@ -3,27 +3,20 @@ ARG BASE_UBI_IMAGE_TAG=9.5-1736404155
 ARG PYTHON_VERSION=3.12
 FROM registry.access.redhat.com/ubi9/ubi-minimal:${BASE_UBI_IMAGE_TAG} AS base
 
-# Install basic dependencies
+WORKDIR /workspace
+
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# Python Installation
+FROM base AS python-install
+
 ARG PYTHON_VERSION
 ENV PYTHON_VERSION=${PYTHON_VERSION}
 RUN microdnf -y update && microdnf install -y \
     python${PYTHON_VERSION}-pip python${PYTHON_VERSION}-wheel \
     && microdnf clean all
 
-WORKDIR /workspace
-
-ENV LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
-
-# Install development utilities
-RUN microdnf install -y \
-    which procps findutils tar vim git gcc g++ make patch make cython zlib-devel \
-    libjpeg-turbo-devel libtiff-devel libpng-devel libwebp-devel freetype-devel harfbuzz-devel \
-    openssl-devel openblas openblas-devel wget autoconf automake libtool cmake && \
-    microdnf clean all
-
-# Python Installation
-FROM base AS python-install
 ARG PYTHON_VERSION
 
 ENV VIRTUAL_ENV=/opt/vllm
@@ -31,17 +24,50 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV PYTHON_VERSION=${PYTHON_VERSION}
 RUN microdnf install -y \
     python${PYTHON_VERSION}-devel  && \
-    python${PYTHON_VERSION} -m venv $VIRTUAL_ENV && pip install --no-cache -U pip wheel uv && microdnf clean all
+    python${PYTHON_VERSION} -m venv $VIRTUAL_ENV && \
+    pip install --no-cache -U pip wheel uv && \
+    microdnf clean all
 
-# Upgrade pip and install base tools
-RUN python -m pip install -U pip wheel uv cmake setuptools
 
-FROM python-install AS pyarrow
+FROM python-install as devel
+
+RUN microdnf install -y \
+    which procps findutils tar vim git gcc g++ make patch make zlib-devel \
+    libjpeg-turbo-devel libtiff-devel libpng-devel libwebp-devel freetype-devel harfbuzz-devel \
+    openssl-devel openblas openblas-devel wget autoconf automake libtool cmake && \
+    microdnf clean all
+
+FROM devel AS numa-build
+# Install numactl (needed for numa.h dependency)
+WORKDIR /tmp/
+RUN curl -LO https://github.com/numactl/numactl/archive/refs/tags/v2.0.16.tar.gz && \
+    tar -xvzf v2.0.16.tar.gz && \
+    cd numactl-2.0.16 && \
+    ./autogen.sh && \
+    ./configure && \
+    make
+
+# Set include path
+ENV C_INCLUDE_PATH="/usr/local/include:$C_INCLUDE_PATH"
+
+
+FROM devel AS rust
+
+ENV CARGO_HOME=/root/.cargo
+ENV RUSTUP_HOME=/root/.rustup
+ENV PATH="$CARGO_HOME/bin:$RUSTUP_HOME/bin:$PATH"
+
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && \
+    . "$CARGO_HOME/env" && \
+    rustup default stable && \
+    rustup show
+
+
+FROM devel AS pyarrow-wheel
 
 # Build Apache Arrow
 WORKDIR /tmp
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,target=/root/.cache/uv \
     git clone https://github.com/apache/arrow.git && \
     cd arrow/cpp && \
     mkdir release && cd release && \
@@ -65,36 +91,43 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     cd ../../python && \
     export PYARROW_PARALLEL=4 && \
     export ARROW_BUILD_TYPE=release && \
-    python -m pip install -r requirements-build.txt && \
+    uv pip install -r requirements-wheel-build.txt && \
     python setup.py build_ext --build-type=$ARROW_BUILD_TYPE --bundle-arrow-cpp bdist_wheel
 
-FROM python-install AS numa-build
-# Install numactl (needed for numa.h dependency)
-WORKDIR /tmp
-RUN curl -LO https://github.com/numactl/numactl/archive/refs/tags/v2.0.16.tar.gz && \
-    tar -xvzf v2.0.16.tar.gz && \
-    cd numactl-2.0.16 && \
-    ./autogen.sh && \
-    ./configure && \
-    make && \
-    make install
+FROM devel AS python-dependencies
 
-# Set include path
-ENV C_INCLUDE_PATH="/usr/local/include:$C_INCLUDE_PATH"
-
-FROM python-install AS rust
 ENV CARGO_HOME=/root/.cargo
 ENV RUSTUP_HOME=/root/.rustup
 ENV PATH="$CARGO_HOME/bin:$RUSTUP_HOME/bin:$PATH"
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && \
-    . "$CARGO_HOME/env" && \
-    rustup default stable && \
-    rustup show
+# Install dependencies, including PyTorch and Apache Arrow
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,from=rust,source=/root/.cargo,target=/root/.cargo,rw \
+    --mount=type=bind,from=rust,source=/root/.rustup,target=/root/.rustup,rw \
+    --mount=type=bind,from=pyarrow-wheel,source=/tmp/arrow/python/dist,target=/tmp/arrow-wheel \
+    pyarrow_wheel=$(ls /tmp/arrow-wheels/pyarrow-*.whl | head -n 1) && \
+    uv pip install -v \
+        --extra-index-url https://download.pytorch.org/whl/nightly/cpu \
+        --index-strategy unsafe-best-match \
+        -r requirements-build.txt \
+        -r requirements-cpu.txt \
+        "$(echo /tmp/pyarrow-wheel/pyarrow-*.whl)"
 
-FROM python-install AS python-dependencies
 
-# Copy vLLM source
+FROM python-dependencies as torchvision-wheel
+
+ARG TORCH_VISION_VERSION=v0.20.1
+WORKDIR /tmp
+RUN git clone https://github.com/pytorch/vision.git && \
+    cd vision && \
+    git checkout $TORCH_VISION_VERSION && \
+    python setup.py bdist_wheel
+
+
+# vllm build stage
+FROM python-dependencies AS vllm-wheel
+ARG PYTHON_VERSION
+
 COPY . /workspace/vllm
 WORKDIR /workspace/vllm
 
@@ -103,60 +136,34 @@ ARG GIT_REPO_CHECK=0
 RUN --mount=type=bind,source=.git,target=.git \
     if [ "$GIT_REPO_CHECK" != 0 ]; then bash tools/check_repo.sh; fi
 
-ENV CARGO_HOME=/root/.cargo
-ENV RUSTUP_HOME=/root/.rustup
-ENV PATH="$CARGO_HOME/bin:$RUSTUP_HOME/bin:$PATH"
-
-# Install dependencies, including PyTorch and Apache Arrow
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,from=rust,source=/root/.cargo,target=/root/.cargo,rw \
-    --mount=type=bind,from=rust,source=/root/.rustup,target=/root/.rustup,rw \
-    --mount=type=bind,from=pyarrow,source=/tmp/arrow/python/dist,target=/tmp/arrow-wheels \
-     WHL_FILE=$(ls /tmp/arrow-wheels/pyarrow-*.whl | head -n 1) && \
-    pip install -v \
-        'cmake>=3.26' ninja packaging 'setuptools-scm>=8' wheel jinja2 $WHL_FILE  \
-        --extra-index-url https://download.pytorch.org/whl/nightly/cpu \
-        -r requirements-cpu.txt
-
-# Install torchvision
-ARG TORCH_VISION_VERSION=v0.20.1
-WORKDIR /tmp
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=cache,target=/root/.cache/uv \
-    git clone https://github.com/pytorch/vision.git && \
-    cd vision && \
-    git checkout $TORCH_VISION_VERSION && \
-    python setup.py bdist_wheel && \
-    uv pip install dist/*.whl
-
-# Final build stage
-FROM python-install AS vllm-cpu
-ARG PYTHON_VERSION
+# Install numactl
+RUN --mount=type=bind,from=numa-build,src=/tmp/numactl-2.0.16,target=/numactl \
+    make -C /numactl install
 
 # Set correct library path for torch and numactl
 ENV LD_LIBRARY_PATH="/opt/vllm/lib64/python${PYTHON_VERSION}/site-packages/torch/lib:/usr/local/lib:$LD_LIBRARY_PATH"
-WORKDIR /workspace/vllm
-ENV C_INCLUDE_PATH="/usr/local/include:$C_INCLUDE_PATH"
-ENV UV_LINK_MODE=copy
 
-COPY --from=numa-build /usr/local/lib /usr/local/lib
-COPY --from=numa-build /usr/local/include /usr/local/include
+# Build vllm
+RUN VLLM_TARGET_DEVICE=cpu python setup.py bdist_wheel
 
-COPY --from=python-dependencies /opt/vllm /opt/vllm
-COPY --from=python-dependencies /workspace/vllm /workspace/vllm
 
-# Build and install vllm
-RUN --mount=type=cache,target=/root/.cache/pip \
+# Final deployment stage
+FROM python-install AS vllm-openai
+
+RUN --mount=type=bind,from=vllm-wheel,src=/workspace/vllm/dist,target=/tmp/vllm-wheel \
+    --mount=type=bind,from=pyarrow-wheel,src=/tmp/arrow/python/dist,target=/tmp/pyarrow-wheel \
+    --mount=type=bind,from=torchvision-wheel,src=/tmp/torchvision/dist,target=/tmp/torchvision-wheel \
     --mount=type=cache,target=/root/.cache/uv \
-    VLLM_TARGET_DEVICE=cpu python setup.py bdist_wheel && \
-    uv pip install "$(echo dist/*.whl)[tensorizer]"
+    uv pip install \
+        "$(echo /tmp/vllm-wheel/*.whl)[tensorizer]" \
+        "$(echo /tmp/pyarrow-wheel/pyarrow-*.whl)" \
+        "$(echo /tmp/torchvision-wheel/*.whl)"
 
 # setup non-root user for vllm
 RUN umask 002 && \
     useradd --uid 2000 --gid 0 vllm && \
     mkdir -p /home/vllm && \
-    chmod g+rwx /home/vllm /usr/src /workspace
+    chmod g+rwx /home/vllm
 
 COPY LICENSE /licenses/vllm.md
 COPY examples/*.jinja /app/data/template/
@@ -164,5 +171,4 @@ COPY examples/*.jinja /app/data/template/
 USER 2000
 WORKDIR /home/vllm
 
-# Set the default entrypoint
-ENTRYPOINT ["/opt/vllm/bin/python", "-m", "vllm.entrypoints.openai.api_server"]
+ENTRYPOINT ["python", "-m", "vllm.entrypoints.openai.api_server"]
