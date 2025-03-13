@@ -123,6 +123,7 @@ RUN --mount=type=bind,from=numa-build,src=/tmp/numactl-2.0.16,target=/numactl \
 
 # FIXME: given that we `uv build` torch-vision above, do we need to bind-mount/install the vision wheel
 #       or will a generic install pick the built version from the cache? Can we do the same for arrow?
+#       it should be good as long as the build arg TORCH_VISION_VERSION matches `requirements-*.txt`
 
 # Install dependencies, including PyTorch and Apache Arrow
 RUN --mount=type=cache,target=/root/.cache/uv \
