@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 import torch
-from vllm._ops_dispatch import get_ops
+from vllm._ops_dispatch import get_ops, has_op
 from torch._higher_order_ops import auto_functionalized
 from torch._ops import OpOverload
 
@@ -35,7 +35,7 @@ QUANT_OPS: dict[QuantKey, OpOverload] = {
     kFp8DynamicTokenSym: get_ops().dynamic_per_token_scaled_fp8_quant.default,  # noqa: E501
 }
 
-if current_platform.is_cuda() and hasattr(torch.ops._C, "scaled_fp4_quant"):
+if current_platform.is_cuda() and has_op("scaled_fp4_quant"):
     QUANT_OPS[kNvfp4Quant] = get_ops().scaled_fp4_quant.default  # noqa: E501
 
 if current_platform.is_cuda():

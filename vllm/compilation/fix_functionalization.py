@@ -5,7 +5,7 @@ import operator
 from collections.abc import Iterable
 
 import torch
-from vllm._ops_dispatch import get_ops
+from vllm._ops_dispatch import get_ops, has_op
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
 
 from vllm.logger import init_logger
@@ -131,7 +131,7 @@ class FixFunctionalizationPass(VllmInductorPass):
                     graph, node, mutated_args, args=("result", "input", "scale")
                 )
             elif (
-                hasattr(torch.ops._C, "silu_and_mul_nvfp4_quant")
+                has_op("silu_and_mul_nvfp4_quant")
                 and at_target == get_ops().silu_and_mul_nvfp4_quant.default
             ):
                 mutated_args = {1: "result", 2: "result_block_scale"}

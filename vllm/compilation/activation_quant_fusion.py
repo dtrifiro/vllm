@@ -4,7 +4,7 @@
 from abc import ABC, abstractmethod
 
 import torch
-from vllm._ops_dispatch import get_ops
+from vllm._ops_dispatch import get_ops, has_op
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
 from torch._inductor.pattern_matcher import (
     PatternMatcherPass,
@@ -37,8 +37,8 @@ SILU_MUL_OP = get_ops().silu_and_mul.default
 FUSED_OPS: dict[QuantKey, OpOverload] = {
     kFp8StaticTensorSym: get_ops().silu_and_mul_quant.default,  # noqa: E501
 }
-silu_and_mul_nvfp4_quant_supported = current_platform.is_cuda() and hasattr(
-    torch.ops._C, "silu_and_mul_nvfp4_quant"
+silu_and_mul_nvfp4_quant_supported = current_platform.is_cuda() and has_op(
+    "silu_and_mul_nvfp4_quant"
 )
 if silu_and_mul_nvfp4_quant_supported:
     FUSED_OPS[kNvfp4Quant] = get_ops().silu_and_mul_nvfp4_quant.default  # noqa: E501
