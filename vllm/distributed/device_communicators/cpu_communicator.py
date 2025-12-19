@@ -5,7 +5,7 @@ import os
 from typing import Any
 
 import torch
-from vllm._ops_dispatch import get_ops
+from vllm._ops_dispatch import get_ops, has_op
 from torch.distributed import ProcessGroup
 
 from vllm.distributed.utils import pickle
@@ -28,7 +28,7 @@ class CpuCommunicator(DeviceCommunicatorBase):
 
         if (
             (current_platform.get_cpu_architecture() == CpuArchEnum.X86)
-            and hasattr(torch.ops._C, "init_shm_manager")
+            and has_op("init_shm_manager")
             and (unique_name.startswith("tp") or unique_name.startswith("pp"))
         ):
             self.dist_module = _CPUSHMDistributed(self)

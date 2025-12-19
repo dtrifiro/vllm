@@ -3,7 +3,7 @@
 from importlib.util import find_spec
 
 import torch
-from vllm._ops_dispatch import get_ops
+from vllm._ops_dispatch import get_ops, has_op
 import torch._inductor.pattern_matcher as pm
 import torch.fx as fx
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
@@ -46,7 +46,7 @@ else:
 
 logger = init_logger(__name__)
 
-if hasattr(torch.ops._C, "scaled_fp4_quant"):
+if has_op("scaled_fp4_quant"):
     STATIC_FP4_QUANT_OP = get_ops().scaled_fp4_quant.default
 
 
