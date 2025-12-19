@@ -9,6 +9,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import torch
+from vllm._ops_dispatch import get_ops
 
 import vllm.envs as envs
 from vllm import _custom_ops as ops
@@ -923,7 +924,7 @@ def per_token_group_quant_fp8(
     # prefer CUDA kernel if available
     # TODO(bnell): this causes some fp8 moe test to fail.
     if current_platform.is_cuda() and x.is_contiguous():
-        torch.ops._C.per_token_group_fp8_quant(
+        get_ops().per_token_group_fp8_quant(
             x, x_q, x_s, group_size, eps, fp8_min, fp8_max, use_ue8m0
         )
         return x_q, x_s
@@ -1031,7 +1032,7 @@ def per_token_group_quant_fp8_packed_for_deepgemm(
     else:
         x_q_local = torch.empty_like(x_contiguous, device=x.device, dtype=dtype)
 
-    torch.ops._C.per_token_group_fp8_quant_packed(
+    get_ops().per_token_group_fp8_quant_packed(
         x_contiguous,
         x_q_local,
         x_s_packed,

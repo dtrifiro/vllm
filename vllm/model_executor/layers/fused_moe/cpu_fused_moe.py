@@ -4,6 +4,7 @@ import weakref
 from collections.abc import Callable
 
 import torch
+from vllm._ops_dispatch import get_ops
 from torch.nn import functional as F
 
 from vllm import _custom_ops as ops
@@ -186,7 +187,7 @@ class SGLFusedMOE:
             e_score_correction_bias=e_score_correction_bias,
         )
 
-        torch.ops._C.fused_experts_cpu(
+        get_ops().fused_experts_cpu(
             x,
             layer.w13_weight,
             layer.w2_weight,

@@ -4,6 +4,7 @@ from importlib.util import find_spec
 from types import ModuleType
 
 import torch
+from vllm._ops_dispatch import get_ops
 import torch._inductor.pattern_matcher as pm
 import torch.fx as fx
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
@@ -43,7 +44,7 @@ if find_spec("flashinfer"):
 logger = init_logger(__name__)
 
 if hasattr(torch.ops._C, "scaled_fp4_quant"):
-    STATIC_FP4_QUANT_OP = torch.ops._C.scaled_fp4_quant.default
+    STATIC_FP4_QUANT_OP = get_ops().scaled_fp4_quant.default
 
 
 class BasePattern:
@@ -275,7 +276,7 @@ class CutlassScaledMMReduceScatterPattern(BasePattern):
             cutlass_mm_output: torch.Tensor,
         ) -> torch.Tensor:
             cutlass_scaled_mm = torch.ops.higher_order.auto_functionalized(
-                torch.ops._C.cutlass_scaled_mm.default,
+                get_ops().cutlass_scaled_mm.default,
                 out=cutlass_mm_output,
                 a=input,
                 b=weight,
@@ -357,7 +358,7 @@ class AllGatherCutlassScaledMMPattern(BasePattern):
             )
 
             cutlass_scaled_mm = torch.ops.higher_order.auto_functionalized(
-                torch.ops._C.cutlass_scaled_mm.default,
+                get_ops().cutlass_scaled_mm.default,
                 out=output,
                 a=all_gather,
                 b=weight,

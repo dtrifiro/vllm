@@ -5,6 +5,7 @@ import enum
 from enum import Enum
 
 import torch
+from vllm._ops_dispatch import get_ops
 from compressed_tensors import CompressionFormat
 from compressed_tensors.quantization import (
     ActivationOrdering,
@@ -2296,7 +2297,7 @@ class CompressedTensorsW4A8Int8MoEMethod(CompressedTensorsMoEMethod):
             renormalize=layer.renormalize,
         )
 
-        return torch.ops._C.dynamic_4bit_int_moe(
+        return get_ops().dynamic_4bit_int_moe(
             x,
             topk_ids.to(torch.long),
             topk_weights,

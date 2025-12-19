@@ -7,6 +7,7 @@ from typing import Any
 
 import gguf
 import torch
+from vllm._ops_dispatch import get_ops
 from gguf import GGMLQuantizationType as WeightType
 from torch.nn.parameter import Parameter, UninitializedParameter
 
@@ -251,9 +252,9 @@ def _fused_moe_gguf(
         output_shape = x.shape[:-1] + (d,)
         out = torch.empty(output_shape, dtype=x.dtype, device=x.device)
         if activation == "silu":
-            torch.ops._C.silu_and_mul(out, x)
+            get_ops().silu_and_mul(out, x)
         elif activation == "gelu":
-            torch.ops._C.gelu_and_mul(out, x)
+            get_ops().gelu_and_mul(out, x)
         else:
             raise ValueError(f"Unsupported activation: {activation}")
         return out

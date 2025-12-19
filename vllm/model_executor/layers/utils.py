@@ -8,6 +8,7 @@ import torch
 
 from vllm import _custom_ops as ops
 from vllm import envs
+from vllm._ops_dispatch import get_ops
 from vllm._aiter_ops import rocm_aiter_ops
 from vllm.logger import init_logger
 from vllm.platforms import CpuArchEnum, current_platform
@@ -241,12 +242,12 @@ def dispatch_cpu_unquantized_gemm(
     dtype = layer.weight.dtype
 
     if envs.VLLM_CPU_SGL_KERNEL and check_cpu_sgl_kernel(N, K, dtype):
-        packed_weight = torch.ops._C.convert_weight_packed(layer.weight)
+        packed_weight = get_ops().convert_weight_packed(layer.weight)
         if getattr(layer, "bias", None) is not None:
             bias_f32 = layer.bias.to(torch.float32)
         else:
             bias_f32 = None
-        layer.cpu_linear = lambda x, weight, bias: torch.ops._C.weight_packed_linear(
+        layer.cpu_linear = lambda x, weight, bias: get_ops().weight_packed_linear(
             x, packed_weight, bias_f32 if bias is not None else None, True
         )
         if remove_weight:

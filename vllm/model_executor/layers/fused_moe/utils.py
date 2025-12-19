@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 
 from vllm import _custom_ops as ops
+from vllm._ops_dispatch import get_ops
 from vllm.model_executor.layers.quantization.utils.fp8_utils import (
     per_token_group_quant_fp8,
 )
@@ -353,11 +354,11 @@ def apply_moe_activation(
 
     # Activations with gated multiplication (gate × activation(up))
     if activation == "silu":
-        torch.ops._C.silu_and_mul(output, input)
+        get_ops().silu_and_mul(output, input)
     elif activation == "gelu":
-        torch.ops._C.gelu_and_mul(output, input)
+        get_ops().gelu_and_mul(output, input)
     elif activation == "swigluoai":
-        torch.ops._C.swigluoai_and_mul(output, input)
+        get_ops().swigluoai_and_mul(output, input)
     elif activation == "swiglustep":
         from vllm.model_executor.layers.activation import swiglustep_and_mul_triton
 

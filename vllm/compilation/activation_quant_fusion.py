@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import torch
+from vllm._ops_dispatch import get_ops
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
 from torch._inductor.pattern_matcher import (
     PatternMatcherPass,
@@ -32,16 +33,16 @@ logger = init_logger(__name__)
 FP8_DTYPE = current_platform.fp8_dtype()
 FP4_DTYPE = torch.uint8
 
-SILU_MUL_OP = torch.ops._C.silu_and_mul.default
+SILU_MUL_OP = get_ops().silu_and_mul.default
 
 FUSED_OPS: dict[QuantKey, OpOverload] = {
-    kFp8StaticTensorSym: torch.ops._C.silu_and_mul_quant.default,  # noqa: E501
+    kFp8StaticTensorSym: get_ops().silu_and_mul_quant.default,  # noqa: E501
 }
-silu_and_mul_nvfp4_quant_supported = current_platform.is_cuda() and hasattr(
-    torch.ops._C, "silu_and_mul_nvfp4_quant"
+silu_and_mul_nvfp4_quant_supported = current_platform.is_cuda() and has_op(
+    "silu_and_mul_nvfp4_quant"
 )
 if silu_and_mul_nvfp4_quant_supported:
-    FUSED_OPS[kNvfp4Dynamic] = torch.ops._C.silu_and_mul_nvfp4_quant.default  # noqa: E501
+    FUSED_OPS[kNvfp4Dynamic] = get_ops().silu_and_mul_nvfp4_quant.default  # noqa: E501
 
 
 class ActivationQuantPattern(ABC):

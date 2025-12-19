@@ -5,6 +5,7 @@
 import torch
 
 from vllm._aiter_ops import rocm_aiter_ops
+from vllm._ops_dispatch import get_ops
 from vllm.forward_context import get_forward_context
 from vllm.logger import init_logger
 from vllm.model_executor.custom_op import CustomOp
@@ -114,7 +115,7 @@ def sparse_attn_indexer(
             topk_indices = topk_indices_buffer[
                 chunk.token_start : chunk.token_end, :topk_tokens
             ]
-            torch.ops._C.top_k_per_row_prefill(
+            get_ops().top_k_per_row_prefill(
                 logits,
                 chunk.cu_seqlen_ks,
                 chunk.cu_seqlen_ke,
@@ -162,7 +163,7 @@ def sparse_attn_indexer(
         num_rows = logits.shape[0]
 
         topk_indices = topk_indices_buffer[:num_padded_tokens, :topk_tokens]
-        torch.ops._C.top_k_per_row_decode(
+        get_ops().top_k_per_row_decode(
             logits,
             next_n,
             decode_metadata.seq_lens,

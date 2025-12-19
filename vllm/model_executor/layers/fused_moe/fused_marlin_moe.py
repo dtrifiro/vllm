@@ -5,6 +5,7 @@
 from collections.abc import Callable
 
 import torch
+from vllm._ops_dispatch import get_ops
 
 import vllm._custom_ops as ops
 import vllm.model_executor.layers.fused_moe.modular_kernel as mk
