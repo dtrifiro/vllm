@@ -3,6 +3,7 @@
 
 
 import torch
+from vllm._ops_dispatch import get_ops
 
 from vllm import _custom_ops as ops
 from vllm import envs
@@ -142,7 +143,7 @@ class CPUScaledMMLinearKernel(ScaledMMLinearKernel):
     def process_weights_for_sgl(self, layer: torch.nn.Module) -> None:
         # WEIGHT
         weight = getattr(layer, self.w_q_name)
-        packed_weight = torch.ops._C.convert_weight_packed(weight)
+        packed_weight = get_ops().convert_weight_packed(weight)
         replace_parameter(
             layer, self.w_q_name, torch.nn.Parameter(packed_weight, requires_grad=False)
         )
@@ -210,7 +211,7 @@ class CPUScaledMMLinearKernel(ScaledMMLinearKernel):
         bias: torch.Tensor | None = None,
     ) -> torch.Tensor:
         w_q, w_s, _, _, _ = self._get_weight_params(layer)
-        return torch.ops._C.int8_scaled_mm_with_quant(
+        return get_ops().int8_scaled_mm_with_quant(
             x,
             w_q,
             w_s,

@@ -4,6 +4,7 @@
 from collections.abc import Callable
 
 import torch
+from vllm._ops_dispatch import get_ops
 import torch._inductor.pattern_matcher as pm
 from torch import fx
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
@@ -21,7 +22,7 @@ from .vllm_inductor_pass import VllmInductorPass, VllmPatternMatcherPass
 
 logger = init_logger(__name__)
 
-FUSED_QK_ROPE_OP = torch.ops._C.fused_qk_norm_rope.default
+FUSED_QK_ROPE_OP = get_ops().fused_qk_norm_rope.default
 
 
 class QkNormRopePattern:

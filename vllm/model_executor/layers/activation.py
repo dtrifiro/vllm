@@ -15,6 +15,7 @@ from vllm.distributed import (
 )
 from vllm.logger import init_logger
 from vllm.model_executor.custom_op import CustomOp
+from vllm._ops_dispatch import get_ops
 from vllm.model_executor.utils import set_weight_attrs
 from vllm.platforms import current_platform
 from vllm.utils.collection_utils import LazyDict
@@ -39,7 +40,7 @@ class FatreluAndMul(CustomOp):
         super().__init__()
         self.threshold = threshold
         if current_platform.is_cuda_alike():
-            self.op = torch.ops._C.fatrelu_and_mul
+            self.op = get_ops().fatrelu_and_mul
         elif current_platform.is_cpu():
             self._forward_method = self.forward_native
 
@@ -72,7 +73,7 @@ class SiluAndMul(CustomOp):
     def __init__(self):
         super().__init__()
         if current_platform.is_cuda_alike():
-            self.op = torch.ops._C.silu_and_mul
+            self.op = get_ops().silu_and_mul
         elif current_platform.is_xpu():
             from vllm._ipex_ops import ipex_ops
 
@@ -115,7 +116,7 @@ class MulAndSilu(CustomOp):
     def __init__(self):
         super().__init__()
         if current_platform.is_cuda_alike():
-            self.op = torch.ops._C.mul_and_silu
+            self.op = get_ops().mul_and_silu
         elif current_platform.is_xpu():
             from vllm._ipex_ops import ipex_ops
 
@@ -213,9 +214,9 @@ class GeluAndMul(CustomOp):
             raise ValueError(f"Unknown approximate mode: {approximate}")
         if current_platform.is_cuda_alike() or current_platform.is_cpu():
             if approximate == "none":
-                self.op = torch.ops._C.gelu_and_mul
+                self.op = get_ops().gelu_and_mul
             elif approximate == "tanh":
-                self.op = torch.ops._C.gelu_tanh_and_mul
+                self.op = get_ops().gelu_tanh_and_mul
         if current_platform.is_rocm() and approximate == "tanh":
             logger.warning_once(
                 "[ROCm] PyTorch's native GELU with tanh approximation is unstable "
@@ -279,7 +280,7 @@ class SwigluOAIAndMul(CustomOp):
         d = x.shape[-1] // 2
         output_shape = x.shape[:-1] + (d,)
         out = torch.empty(output_shape, dtype=x.dtype, device=x.device)
-        torch.ops._C.swigluoai_and_mul(out, x, self.alpha, self.limit)
+        get_ops().swigluoai_and_mul(out, x, self.alpha, self.limit)
         return out
 
     def extra_repr(self) -> str:
@@ -291,7 +292,7 @@ class NewGELU(CustomOp):
     def __init__(self):
         super().__init__()
         if current_platform.is_cuda_alike() or current_platform.is_cpu():
-            self.op = torch.ops._C.gelu_new
+            self.op = get_ops().gelu_new
         elif current_platform.is_xpu():
             from vllm._ipex_ops import ipex_ops
 
@@ -316,7 +317,7 @@ class FastGELU(CustomOp):
     def __init__(self):
         super().__init__()
         if current_platform.is_cuda_alike() or current_platform.is_cpu():
-            self.op = torch.ops._C.gelu_fast
+            self.op = get_ops().gelu_fast
         elif current_platform.is_xpu():
             from vllm._ipex_ops import ipex_ops
 
@@ -341,7 +342,7 @@ class QuickGELU(CustomOp):
     def __init__(self):
         super().__init__()
         if current_platform.is_cuda_alike() or current_platform.is_cpu():
-            self.op = torch.ops._C.gelu_quick
+            self.op = get_ops().gelu_quick
         elif current_platform.is_xpu():
             from vllm._ipex_ops import ipex_ops
 

@@ -8,6 +8,7 @@ from math import prod
 from typing import final
 
 import torch
+from vllm._ops_dispatch import get_ops
 
 import vllm.envs as envs
 from vllm.forward_context import get_forward_context, is_forward_context_available
@@ -578,12 +579,12 @@ class FusedMoEPermuteExpertsUnpermute(ABC):
     ) -> None:
         assert output.size(-1) * 2 == input.size(-1)
         if activation == "silu":
-            torch.ops._C.silu_and_mul(output, input)
+            get_ops().silu_and_mul(output, input)
         elif activation == "gelu":
-            torch.ops._C.gelu_and_mul(output, input)
+            get_ops().gelu_and_mul(output, input)
         elif activation == "swigluoai":
             # alpha = 1.702, limit = 7.0
-            torch.ops._C.swigluoai_and_mul(output, input)
+            get_ops().swigluoai_and_mul(output, input)
         else:
             raise ValueError(f"Unsupported FusedMoe activation: {activation}")
 
