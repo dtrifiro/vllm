@@ -5,6 +5,7 @@
 from collections.abc import Callable
 
 import torch
+from vllm._ops_dispatch import get_ops
 
 import vllm.model_executor.layers.fused_moe.modular_kernel as mk
 from vllm import _custom_ops as ops
@@ -691,7 +692,7 @@ def run_cutlass_moe_fp4(
         blockscale_offsets[:-1],
     )
     del rep_a_fp4, rep_a_blockscale
-    torch.ops._C.silu_and_mul(c2, c1)
+    get_ops().silu_and_mul(c2, c1)
     int_fp4, int_blockscale = ops.scaled_fp4_experts_quant(
         c2, a2_gscale, expert_offsets, blockscale_offsets, num_topk
     )
@@ -1031,7 +1032,7 @@ def run_cutlass_block_scaled_fused_experts(
     )
 
     intermediate = torch.empty((m * topk, n), dtype=out_dtype, device=device)
-    torch.ops._C.silu_and_mul(intermediate, c1)
+    get_ops().silu_and_mul(intermediate, c1)
 
     intermediate_q, a2_scale = _fp8_quantize(
         intermediate, A_scale=None, per_act_token=False, block_shape=[128, 128]

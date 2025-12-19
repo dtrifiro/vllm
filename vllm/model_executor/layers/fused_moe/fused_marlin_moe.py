@@ -5,6 +5,7 @@
 from collections.abc import Callable
 
 import torch
+from vllm._ops_dispatch import get_ops
 
 import vllm._custom_ops as ops
 import vllm.model_executor.layers.fused_moe.modular_kernel as mk
@@ -33,10 +34,10 @@ def default_activation_func(
     activation: str, output: torch.Tensor, input: torch.Tensor
 ) -> None:
     if activation == "silu":
-        torch.ops._C.silu_and_mul(output, input)
+        get_ops().silu_and_mul(output, input)
     elif activation == "swigluoai":
         # alpha = 1.702, limit = 7.0
-        torch.ops._C.swigluoai_and_mul(output, input)
+        get_ops().swigluoai_and_mul(output, input)
     else:
         raise ValueError(
             f"Unsupported activation: {activation}. "
