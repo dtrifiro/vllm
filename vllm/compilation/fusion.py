@@ -3,7 +3,7 @@
 from typing import Any, NamedTuple
 
 import torch
-from vllm._ops_dispatch import get_ops
+from vllm._ops_dispatch import get_ops, has_op
 import torch._inductor.pattern_matcher as pm
 from torch import fx
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
@@ -64,7 +64,7 @@ QUANT_OPS: dict[QuantKey, OpOverload] = {
     kFp8DynamicTokenSym: get_ops().dynamic_per_token_scaled_fp8_quant.default,  # noqa: E501
 }
 if current_platform.is_cuda() and has_op("scaled_fp4_quant"):
-    QUANT_OPS[kNvfp4Dynamic] = get_Ops().scaled_fp4_quant.default
+    QUANT_OPS[kNvfp4Dynamic] = get_ops().scaled_fp4_quant.default
     QUANT_OPS[kFp8Dynamic128Sym] = get_ops().per_token_group_fp8_quant.default  # noqa: E501
     QUANT_OPS[kFp8Dynamic64Sym] = get_ops().per_token_group_fp8_quant.default  # noqa: E501
 

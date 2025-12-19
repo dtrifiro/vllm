@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any, ParamSpec
 
 import torch
+from vllm._ops_dispatch import has_op
 import torch._inductor.pattern_matcher as pm
 from torch import fx
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
@@ -335,7 +336,7 @@ class AttnFusionPass(VllmPatternMatcherPass):
             )
             pattern_fp8.register_if_supported(self.patterns)
 
-            if current_platform.is_cuda() and hasattr(torch.ops._C, "scaled_fp4_quant"):
+            if current_platform.is_cuda() and has_op("scaled_fp4_quant"):
                 pattern_nvfp4 = AttentionNvfp4QuantPattern(
                     layer, config.model_config.dtype
                 )

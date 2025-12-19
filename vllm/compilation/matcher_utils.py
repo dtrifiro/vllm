@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import torch
-from vllm._ops_dispatch import get_ops
+from vllm._ops_dispatch import get_ops, has_op
 from torch._higher_order_ops import auto_functionalized
 from torch._ops import OpOverload
 

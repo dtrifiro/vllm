@@ -4,7 +4,7 @@ import weakref
 from collections.abc import Callable
 
 import torch
-from vllm._ops_dispatch import get_ops
+from vllm._ops_dispatch import get_ops, has_op
 from torch.nn import functional as F
 
 from vllm import _custom_ops as ops
@@ -266,7 +266,7 @@ class CPUFusedMOE:
         self,
         layer: torch.nn.Module,
     ) -> tuple[bool, str]:
-        if not hasattr(torch.ops._C, "prepack_moe_weight"):
+        if not has_op("prepack_moe_weight"):
             return False, "none"
 
         dtype = layer.w13_weight.dtype
