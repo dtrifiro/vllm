@@ -16,7 +16,7 @@ current_platform.import_kernels()
 
 # Import dispatcher for CPU multi-ISA support
 # This routes torch.ops calls to _C or _C_avx512 depending on loaded extension
-from vllm._ops_dispatch import get_ops, get_cpu_ops, has_op
+from vllm._ops_dispatch import get_ops, get_cpu_ops, has_op, _detect_cpu_extension
 
 if TYPE_CHECKING:
 
@@ -538,7 +538,7 @@ def gptq_gemm(
 
 if has_op("gptq_gemm"):
 
-    @register_fake("_C::gptq_gemm")
+    @register_fake(f"{_detect_cpu_extension()}::gptq_gemm")
     def _gptq_gemm_fake(
         a: torch.Tensor,
         b_q_weight: torch.Tensor,
@@ -577,7 +577,7 @@ def gptq_marlin_24_gemm(
 
 if has_op("gptq_marlin_24_gemm"):
 
-    @register_fake("_C::gptq_marlin_24_gemm")
+    @register_fake(f"{_detect_cpu_extension()}::gptq_marlin_24_gemm")
     def _gptq_marlin_24_gemm_fake(
         a: torch.Tensor,
         b_q_weight: torch.Tensor,
@@ -591,7 +591,7 @@ if has_op("gptq_marlin_24_gemm"):
     ) -> torch.Tensor:
         return torch.empty((size_m, size_n), device=a.device, dtype=a.dtype)
 
-    @register_fake("_C::gptq_marlin_gemm")
+    @register_fake(f"{_detect_cpu_extension()}::gptq_marlin_gemm")
     def _gptq_marlin_gemm_fake(
         a: torch.Tensor,
         c: torch.Tensor | None,
@@ -618,7 +618,7 @@ if has_op("gptq_marlin_24_gemm"):
             dtype = b_scales.dtype
         return torch.empty((size_m, size_n), device=a.device, dtype=dtype)
 
-    @register_fake("_C::awq_dequantize")
+    @register_fake(f"{_detect_cpu_extension()}::awq_dequantize")
     def _awq_dequantize_fake(
         qweight: torch.Tensor,
         scales: torch.Tensor,
@@ -632,7 +632,7 @@ if has_op("gptq_marlin_24_gemm"):
         out_c = qout_c * 8
         return torch.empty((in_c, out_c), dtype=scales.dtype, device=scales.device)
 
-    @register_fake("_C::awq_gemm")
+    @register_fake(f"{_detect_cpu_extension()}::awq_gemm")
     def _awq_gemm_fake(
         input: torch.Tensor,
         qweight: torch.Tensor,
@@ -647,7 +647,7 @@ if has_op("gptq_marlin_24_gemm"):
             device=input.device,
         ).sum(0)
 
-    @register_fake("_C::machete_mm")
+    @register_fake(f"{_detect_cpu_extension()}::machete_mm")
     def machete_mm_fake(
         a: torch.Tensor,
         # b_q Should be the tensor returned by machete_prepack_B
@@ -665,7 +665,7 @@ if has_op("gptq_marlin_24_gemm"):
         n = b_q.size(1)
         return torch.empty((m, n), device=a.device, dtype=a.dtype)
 
-    @register_fake("_C::machete_prepack_B")
+    @register_fake(f"{_detect_cpu_extension()}::machete_prepack_B")
     def machete_prepack_B_fake(
         b_q_weight: torch.Tensor,
         a_type: torch.dtype,
@@ -674,7 +674,7 @@ if has_op("gptq_marlin_24_gemm"):
     ) -> torch.Tensor:
         return torch.empty_like(b_q_weight, memory_format=torch.contiguous_format)
 
-    @register_fake("_C::cutlass_w4a8_mm")
+    @register_fake(f"{_detect_cpu_extension()}::cutlass_w4a8_mm")
     def cutlass_w4a8_mm_fake(
         a: torch.Tensor,
         # b_q Should be the tensor returned by cutlass_encode_and_reorder_int4b
@@ -691,22 +691,22 @@ if has_op("gptq_marlin_24_gemm"):
         out_dtype = out_type if out_type is not None else torch.bfloat16
         return torch.empty((m, n), device=a.device, dtype=out_dtype)
 
-    @register_fake("_C::cutlass_pack_scale_fp8")
+    @register_fake(f"{_detect_cpu_extension()}::cutlass_pack_scale_fp8")
     def cutlass_pack_scale_fp8_fake(scales: torch.Tensor) -> torch.Tensor:
         return torch.empty_like(scales, memory_format=torch.contiguous_format)
 
-    @register_fake("_C::cutlass_encode_and_reorder_int4b")
+    @register_fake(f"{_detect_cpu_extension()}::cutlass_encode_and_reorder_int4b")
     def cutlass_encode_and_reorder_int4b_fake(b: torch.Tensor) -> torch.Tensor:
         return torch.empty_like(b, memory_format=torch.contiguous_format)
 
-    @register_fake("_C::cutlass_encode_and_reorder_int4b_grouped")
+    @register_fake(f"{_detect_cpu_extension()}::cutlass_encode_and_reorder_int4b_grouped")
     def cutlass_encode_and_reorder_int4b_grouped_fake(b: torch.Tensor) -> torch.Tensor:
         return torch.empty_like(b, memory_format=torch.contiguous_format)
 
 
 if has_op("allspark_w8a16_gemm"):
 
-    @register_fake("_C::allspark_w8a16_gemm")
+    @register_fake(f"{_detect_cpu_extension()}::allspark_w8a16_gemm")
     def _allspark_w8a16_gemm_fake(
         a: torch.Tensor,
         b_qweight: torch.Tensor,
@@ -2653,7 +2653,7 @@ def sm100_cutlass_mla_get_workspace_size(
 
 if has_op("weight_packed_linear"):
 
-    @register_fake("_C::weight_packed_linear")
+    @register_fake(f"{_detect_cpu_extension()}::weight_packed_linear")
     def weight_packed_linear_fake(
         mat1: torch.Tensor,
         mat2: torch.Tensor,
@@ -2667,7 +2667,7 @@ if has_op("weight_packed_linear"):
 
 if has_op("fused_experts_cpu"):
 
-    @register_fake("_C::fused_experts_cpu")
+    @register_fake(f"{_detect_cpu_extension()}::fused_experts_cpu")
     def fused_experts_cpu_fake(
         hidden_states: torch.Tensor,
         w1: torch.Tensor,
@@ -2689,7 +2689,7 @@ if has_op("fused_experts_cpu"):
 
 if has_op("int8_scaled_mm_with_quant"):
 
-    @register_fake("_C::int8_scaled_mm_with_quant")
+    @register_fake(f"{_detect_cpu_extension()}::int8_scaled_mm_with_quant")
     def int8_scaled_mm_with_quant_fake(
         mat1: torch.Tensor,
         mat2: torch.Tensor,
@@ -2714,7 +2714,7 @@ class CPUDNNLGEMMHandler:
             get_ops().release_dnnl_matmul_handler(self.handler)
 
 
-_supports_onednn = bool(has_op("create_onednn_mm_handler"))
+_supports_onednn = bool(has_op("create_onednn_mm_handler")) # FIXME: could be cleaned up
 
 
 def is_onednn_acl_supported():
