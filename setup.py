@@ -266,7 +266,7 @@ class cmake_build_ext(build_ext):
                 "--install",
                 ".",
                 "--prefix",
-                prefix,
+                prefix.as_posix(),  # FIXME: verify that this doesn't break the build
                 "--component",
                 target_name(ext.name),
             ]
@@ -757,6 +757,8 @@ if _is_cuda():
 
 if _build_custom_ops():
     ext_modules.append(CMakeExtension(name="vllm._C"))
+    if _is_cpu():
+        ext_modules.append(CMakeExtension(name="vllm._C_avx512"))
 
 package_data = {
     "vllm": [

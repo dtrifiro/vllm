@@ -5,6 +5,7 @@ import os
 from typing import Any
 
 import torch
+from vllm._ops_dispatch import get_ops, has_op
 from torch.distributed import ProcessGroup
 
 from vllm.distributed.utils import pickle
@@ -27,7 +28,7 @@ class CpuCommunicator(DeviceCommunicatorBase):
 
         if (
             (current_platform.get_cpu_architecture() == CpuArchEnum.X86)
-            and hasattr(torch.ops._C, "init_shm_manager")
+            and has_op("init_shm_manager")
             and (unique_name.startswith("tp") or unique_name.startswith("pp"))
         ):
             self.dist_module = _CPUSHMDistributed(self)
@@ -125,13 +126,13 @@ class _CPUSHMDistributed:
         self.handle = self._init_cpu_shm()
 
     def _init_cpu_shm(self) -> int:
-        handle = torch.ops._C.init_shm_manager(
+        handle = get_ops().init_shm_manager(
             self.group_name,
             self.communicator.world_size,
             self.communicator.rank,
         )
         torch.distributed.barrier(self.communicator.device_group)
-        torch.ops._C.join_shm_manager(
+        get_ops().join_shm_manager(
             handle,
             self.group_name,
         )
@@ -142,7 +143,7 @@ class _CPUSHMDistributed:
     def all_reduce(
         self, input: torch.Tensor, group: ProcessGroup | None = None
     ) -> None:
-        torch.ops._C.shm_allreduce(self.handle, input)
+        get_ops().shm_allreduce(self.handle, input)
 
     def gather(
         self,
@@ -152,7 +153,7 @@ class _CPUSHMDistributed:
         group: ProcessGroup | None = None,
     ) -> None:
         # Note: different from the torch gather, here we use local dst rank.
-        torch.ops._C.shm_gather(
+        get_ops().shm_gather(
             self.handle,
             input,
             gather_list,
@@ -165,7 +166,7 @@ class _CPUSHMDistributed:
         input: torch.Tensor,
         group: ProcessGroup | None = None,
     ) -> None:
-        torch.ops._C.shm_all_gather(self.handle, input, output)
+        get_ops().shm_all_gather(self.handle, input, output)
 
     def send_tensor_dict(
         self,
@@ -184,7 +185,7 @@ class _CPUSHMDistributed:
         )
         value_list.append(key_size_tensor)
 
-        torch.ops._C.shm_send_tensor_list(self.handle, value_list, dst)
+        get_ops().shm_send_tensor_list(self.handle, value_list, dst)
 
         return None
 
@@ -192,7 +193,7 @@ class _CPUSHMDistributed:
         self,
         src: int,
     ) -> dict[str, torch.Tensor | Any]:
-        tensor_list = torch.ops._C.shm_recv_tensor_list(self.handle, src)
+        tensor_list = get_ops().shm_recv_tensor_list(self.handle, src)
 
         value_list: list[torch.Tensor] = tensor_list[:-1]
         key_size_tensor = tensor_list[-1]

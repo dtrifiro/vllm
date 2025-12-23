@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import numpy as np
 import numpy.typing as npt
 import torch
+from vllm._ops_dispatch import get_ops
 from packaging import version
 from packaging.version import Version
 from torch.library import Library, infer_schema
@@ -557,7 +558,7 @@ def weak_ref_tensor(tensor: Any) -> Any:
     but will not keep the original tensor alive.
     """
     if isinstance(tensor, torch.Tensor):
-        return torch.ops._C.weak_ref_tensor(tensor)
+        return get_ops().weak_ref_tensor(tensor)
     else:
         return tensor
 
@@ -595,7 +596,7 @@ def get_cuda_view_from_cpu_tensor(cpu_tensor: torch.Tensor) -> torch.Tensor:
     Get a CUDA view of a CPU tensor using Unified Virtual Addressing (UVA).
     """
     assert cpu_tensor.is_pinned(), "CPU tensor must be pinned"
-    return torch.ops._C.get_cuda_view_from_cpu_tensor(cpu_tensor)
+    return get_ops().get_cuda_view_from_cpu_tensor(cpu_tensor)
 
 
 # Helper function used in testing.

@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
+import contextlib
 import glob
+import importlib
 import json
 import os
 import platform
@@ -419,3 +421,21 @@ class CpuPlatform(Platform):
     @classmethod
     def support_hybrid_kv_cache(cls) -> bool:
         return True
+
+    @classmethod
+    def import_kernels(cls) -> None:
+        """Import CPU C kernels."""
+        import torch
+
+        if torch.cpu._is_avx512_supported():  # noqa: SIM108
+            module = "vllm._C_avx512"
+        elif torch.cpu._is_avx2_supported():
+            # FIXME: dispatch on other instructions sets
+            module = "vllm._C"
+        else:
+            raise NotImplementedError("This requires AVX2 or AVX512.")
+
+        importlib.import_module(module)
+
+        with contextlib.suppress(ImportError):
+            import vllm._moe_C  # noqa: F401

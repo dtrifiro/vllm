@@ -9,6 +9,7 @@ from collections.abc import Callable
 from typing import Any
 
 import torch
+from vllm._ops_dispatch import get_ops
 import torch.nn.functional as F
 
 import vllm.envs as envs
@@ -2015,16 +2016,16 @@ def fused_experts_impl(
 
         # Activation function with multiplication
         if activation == "silu":
-            torch.ops._C.silu_and_mul(
+            get_ops().silu_and_mul(
                 intermediate_cache2, intermediate_cache1.view(-1, N)
             )
         elif activation == "gelu":
-            torch.ops._C.gelu_and_mul(
+            get_ops().gelu_and_mul(
                 intermediate_cache2, intermediate_cache1.view(-1, N)
             )
         elif activation == "swigluoai":
             # alpha = 1.702, limit = 7.0
-            torch.ops._C.swigluoai_and_mul(
+            get_ops().swigluoai_and_mul(
                 intermediate_cache2, intermediate_cache1.view(-1, N)
             )
         # Activation function without multiplication

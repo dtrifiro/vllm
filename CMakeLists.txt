@@ -63,13 +63,16 @@ set(TORCH_SUPPORTED_VERSION_ROCM "2.9.1")
 # Try to find python package with an executable that exactly matches
 # `VLLM_PYTHON_EXECUTABLE` and is one of the supported versions.
 #
-if (VLLM_PYTHON_EXECUTABLE)
-  find_python_from_executable(${VLLM_PYTHON_EXECUTABLE} "${PYTHON_SUPPORTED_VERSIONS}")
-else()
+if(NOT VLLM_PYTHON_EXECUTABLE)
+    find_program(VLLM_PYTHON_EXECUTABLE "python3" "python")
+endif()
+if(NOT VLLM_PYTHON_EXECUTABLE)
   message(FATAL_ERROR
-    "Please set VLLM_PYTHON_EXECUTABLE to the path of the desired python version"
+    "python not found, please set VLLM_PYTHON_EXECUTABLE to the path of the desired python version"
     " before running cmake configure.")
 endif()
+
+find_python_from_executable(${VLLM_PYTHON_EXECUTABLE} "${PYTHON_SUPPORTED_VERSIONS}")
 
 #
 # Update cmake's `CMAKE_PREFIX_PATH` with torch location.
@@ -90,6 +93,17 @@ endif()
 #
 find_package(Torch REQUIRED)
 
+#
+# Forward the non-CUDA device extensions to external CMake scripts.
+#
+if (NOT VLLM_TARGET_DEVICE STREQUAL "cuda" AND NOT VLLM_TARGET_DEVICE STREQUAL "rocm")
+    if (VLLM_TARGET_DEVICE STREQUAL "cpu")
+        include(${CMAKE_CURRENT_LIST_DIR}/cmake/cpu_extension.cmake)
+    endif()
+
+    return()
+endif()
+
 # Supported NVIDIA architectures.
 # This check must happen after find_package(Torch) because that's when CMAKE_CUDA_COMPILER_VERSION gets defined
 if(DEFINED CMAKE_CUDA_COMPILER_VERSION AND
@@ -100,19 +114,6 @@ elseif(DEFINED CMAKE_CUDA_COMPILER_VERSION AND
   set(CUDA_SUPPORTED_ARCHS "7.0;7.2;7.5;8.0;8.6;8.7;8.9;9.0;10.0;10.1;12.0")
 else()
   set(CUDA_SUPPORTED_ARCHS "7.0;7.2;7.5;8.0;8.6;8.7;8.9;9.0")
-endif()
-
-#
-# Forward the non-CUDA device extensions to external CMake scripts.
-#
-if (NOT VLLM_TARGET_DEVICE STREQUAL "cuda" AND
-    NOT VLLM_TARGET_DEVICE STREQUAL "rocm")
-    if (VLLM_TARGET_DEVICE STREQUAL "cpu")
-        include(${CMAKE_CURRENT_LIST_DIR}/cmake/cpu_extension.cmake)
-    else()
-        return()
-    endif()
-    return()
 endif()
 
 #

@@ -8,6 +8,7 @@ from typing import Any
 import torch
 
 from vllm import envs
+from vllm._ops_dispatch import get_utils
 from vllm.config import VllmConfig
 from vllm.logger import init_logger
 from vllm.model_executor.utils import set_random_seed
@@ -81,7 +82,8 @@ class CPUWorker(Worker):
             self.local_omp_cpuid = omp_cpuids_list[self.rank]
 
         if self.local_omp_cpuid != "nobind":
-            ret = torch.ops._C_utils.init_cpu_threads_env(self.local_omp_cpuid)
+            # Use dispatcher to route to correct utils module (_C_utils or _C_avx512_utils)
+            ret = get_utils().init_cpu_threads_env(self.local_omp_cpuid)
             if ret:
                 logger.info(ret)
 
